@@ -1,0 +1,33 @@
+# 忽略所有 .log 文件
+*.log
+
+# 忽略特定文件夹（结尾的 / 表示目录）
+# temp/
+__pycache__/
+data
+logs/check_damaged_crops/
+logs/vis_results/
+
+# 忽略某个具体文件
+# config/database.ini
+
+# 忽略所有 .txt 文件，但不忽略 important.txt
+*.bmp
+*.jpg
+*.png
+# !important.txt
+
+# 忽略根目录下的 secret.env 文件（不是任意子目录下的）
+# /secret.env
+
+# 忽略任意层级的 build 文件夹
+# **/build/
+
+# 忽略 node_modules 文件夹（常见于前端项目）
+# node_modules/
+
+# 忽略 .vscode 配置（如果不想共享）
+.vscode/
+
+# 忽略 DS_Store 文件（macOS 系统文件）
+# .DS_Store
