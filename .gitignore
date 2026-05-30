@@ -1,10 +1,10 @@
 # 忽略所有 .log 文件
-*.log
+# *.log
 
 # 忽略特定文件夹（结尾的 / 表示目录）
 # temp/
 __pycache__/
-data
+data/
 logs/check_damaged_crops/
 logs/vis_results/
 weights/
