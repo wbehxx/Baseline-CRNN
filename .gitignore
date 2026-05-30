@@ -7,6 +7,7 @@ __pycache__/
 data
 logs/check_damaged_crops/
 logs/vis_results/
+weights/
 
 # 忽略某个具体文件
 # config/database.ini
