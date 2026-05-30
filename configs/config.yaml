@@ -1,0 +1,37 @@
+# ==========================================
+# DeepJiandu CRNN Baseline 配置文件
+# ==========================================
+
+project:
+  name: "DeepJiandu_CRNN_Baseline"
+  seed: 42                      # 固定随机种子，保证实验结果可复现
+
+data:
+  train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt"
+  train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train"
+  val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val_labels.txt"
+  val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val"
+  test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test_labels.txt"
+  test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test"
+  dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt"
+
+model:
+  # img_height: 32                # CRNN 标准输入高度
+  # max_width: 512                # 序列最大宽度（不足补零，超出截断）
+  img_height: 48
+  max_width: 1024
+  
+  
+  nc: 1                         # 图像通道数（红外/灰度图必须设为 1）
+  nh: 256                       # BiLSTM 的隐藏层维度
+
+train:
+  epochs: 100                    # 训练总轮数
+  batch_size: 64                # 批次大小（若显存溢出可改为 32 或 16）
+  learning_rate: 0.001          # 初始学习率
+  num_workers: 0                # DataLoader 多进程加载数据的线程数
+
+log:
+  weights_dir: "/home/mwl/disk_space/Baseline-CRNN/weights/"       # 模型权重保存目录
+  logs_dir: "/home/mwl/disk_space/Baseline-CRNN/logs/"             # 训练日志保存目录
+  val_interval: 1               # 每隔几个 epoch 进行一次验证并保存模型
