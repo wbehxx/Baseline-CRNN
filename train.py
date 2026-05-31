@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR, ReduceLROnPlateau
 from torchaudio.models.decoder import ctc_decoder
 # 导入我们之前写好的模块
-from dataset import JianduDataset, jiandu_collate_fn
+from dataset import JianduDataset, jiandu_collate_fn , LengthGroupedBatchSampler
 from model_crnn import CRNN
 from utils import get_logger, CTCLabelConverter, calculate_cer
 from model_v4 import build_ppocrv4_jiandu
@@ -32,15 +32,18 @@ def train():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(f"💻 使用设备: {device}")
 
-    # 3. 实例化 Dataset 和 DataLoader
+
+    # # ================= 【修改后】3. 实例化 Dataset 和 DataLoader =================
     logger.info("📦 正在加载数据集...")
+    
+    # 实例化 Dataset（完全保持你原有的精准传参，不需要动）
     train_dataset = JianduDataset(
         labels_txt_path=config['data']['train_list'],
         img_dir=config['data']['train_dir'],
         dict_path=config['data']['dict_path'],
         img_height=config['model']['img_height'],
         max_width=config['model']['max_width'],
-        is_train=True  # <--- 【关键修改】激活数据增强！
+        is_train=True  # 激活数据增强
     )
     
     val_dataset = JianduDataset(
@@ -49,20 +52,71 @@ def train():
         dict_path=config['data']['dict_path'],
         img_height=config['model']['img_height'],
         max_width=config['model']['max_width'],
-        is_train=False # <--- 保持验证集纯净
+        is_train=False # 保持验证集纯净
     )
 
+    # 实例化分桶采样器（使用你 config 里的专属 Key）
+    train_batch_sampler = LengthGroupedBatchSampler(
+        dataset=train_dataset,
+        batch_size=config['train']['batch_size'],
+        shuffle=True  # 训练集打乱桶的顺序
+    )
+    
+    val_batch_sampler = LengthGroupedBatchSampler(
+        dataset=val_dataset,
+        batch_size=config['train']['batch_size'],
+        shuffle=False # 验证集绝对不打乱
+    )
+
+    # 实例化 DataLoader
+    # 【⚠️ 核心注意】：一旦指定了 batch_sampler，DataLoader 内部原有的 batch_size 和 shuffle 参数必须删掉！
     train_loader = DataLoader(
-        train_dataset, batch_size=config['train']['batch_size'], 
-        shuffle=True, num_workers=config['train']['num_workers'], 
-        collate_fn=jiandu_collate_fn, pin_memory=True
+        dataset=train_dataset, 
+        batch_sampler=train_batch_sampler, # 👈 接入训练分桶器
+        num_workers=config['train']['num_workers'], 
+        collate_fn=jiandu_collate_fn, 
+        pin_memory=True
     )
     
     val_loader = DataLoader(
-        val_dataset, batch_size=config['train']['batch_size'], 
-        shuffle=False, num_workers=config['train']['num_workers'], 
-        collate_fn=jiandu_collate_fn, pin_memory=True
+        dataset=val_dataset, 
+        batch_sampler=val_batch_sampler,   # 👈 接入验证分桶器
+        num_workers=config['train']['num_workers'], 
+        collate_fn=jiandu_collate_fn, 
+        pin_memory=True
     )
+    # ==============================================================================
+    # # 3. 实例化 Dataset 和 DataLoader
+    # logger.info("📦 正在加载数据集...")
+    # train_dataset = JianduDataset(
+    #     labels_txt_path=config['data']['train_list'],
+    #     img_dir=config['data']['train_dir'],
+    #     dict_path=config['data']['dict_path'],
+    #     img_height=config['model']['img_height'],
+    #     max_width=config['model']['max_width'],
+    #     is_train=True  # <--- 【关键修改】激活数据增强！
+    # )
+    
+    # val_dataset = JianduDataset(
+    #     labels_txt_path=config['data']['val_list'],
+    #     img_dir=config['data']['val_dir'],
+    #     dict_path=config['data']['dict_path'],
+    #     img_height=config['model']['img_height'],
+    #     max_width=config['model']['max_width'],
+    #     is_train=False # <--- 保持验证集纯净
+    # )
+
+    # train_loader = DataLoader(
+    #     train_dataset, batch_size=config['train']['batch_size'], 
+    #     shuffle=True, num_workers=config['train']['num_workers'], 
+    #     collate_fn=jiandu_collate_fn, pin_memory=True
+    # )
+    
+    # val_loader = DataLoader(
+    #     val_dataset, batch_size=config['train']['batch_size'], 
+    #     shuffle=False, num_workers=config['train']['num_workers'], 
+    #     collate_fn=jiandu_collate_fn, pin_memory=True
+    # )
 
     # 初始化标签转换器 (翻译官)
     converter = CTCLabelConverter(config['data']['dict_path'])
@@ -354,11 +408,14 @@ def train():
             
             logger.info(f"Epoch {epoch} | 验证 Loss: {avg_val_loss:.4f} | CER: {current_cer:.4f}")
             # 打印几个样本对照，直观感受模型学得怎么样
+            # # 🛠️ 修复：动态寻找整个验证集中真实字数最多的那个样本的索引
+            print_idx = max(range(len(all_targets_str)), key=lambda i: len(all_targets_str[i]))-50
+            logger.info(f"👀抽查样本|预测：{all_preds_str[print_idx]}")
+            logger.info(f"👀抽查样本|真实：{all_targets_str[print_idx]}")
+
             # logger.info(f"👀 抽查样本 -> 预测: {all_preds_str[0]} | 真实: {all_targets_str[0]}")
-            # 打印几个样本对照，直观感受模型学得怎么样
-            logger.info(f"抽查样本|预测：{all_preds_str[0]}")
-            logger.info(f"抽查样本|真实：{all_targets_str[0]}")
-            
+            # logger.info(f"抽查样本|预测：{all_preds_str[0]}")
+            # logger.info(f"抽查样本|真实：{all_targets_str[0]}")
 
             # ================= 在每轮 Epoch 结束时的部分 =================
             # 从第 6 轮开始，把决定权交给自适应衰减器

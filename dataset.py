@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader , Sampler
 import cv2
 import numpy as np
 import os
@@ -195,3 +195,55 @@ if __name__ == '__main__':
         print("Targets Shape (concatenated):", targets.shape)
         print("Target Lengths:", target_lengths)
         break # 只测试第一个 batch
+
+# 分桶采样器：根据图片宽度分组，保证同一 batch 内的图片宽度相近，减少 padding 的浪费
+class LengthGroupedBatchSampler(Sampler):
+    def __init__(self, dataset, batch_size, shuffle=True):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        
+        # 1. 统计 dataset 中所有图片按当前高度缩放后的真实宽度
+        self.group_ids = []
+        for idx in range(len(dataset)):
+            # 🛠️ 核心修复：从 data_list 取出的是纯文件名，必须拼接上完整的 img_dir 前缀！
+            img_name = dataset.data_list[idx][0]
+            img_path = os.path.join(dataset.img_dir, img_name)
+            # 读取灰度图的宽高（使用灰度图速度更快）
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            # 🛡️ 鲁棒性防爆护盾：万一真有破损图片，给一个安全的默认宽度，绝对不能卡死
+            if img is None:
+                print(f"⚠️ [Sampler 警告] 采样器读取图片失败，请检查路径: {img_path}")
+                new_w = dataset.max_width  # 坏图直接赋予最大宽度兜底
+            else:
+                h, w = img.shape[:2]
+                ratio = w / float(h)
+                new_w = int(dataset.img_height * ratio)
+            # 记录这个样本的预测宽度
+            self.group_ids.append(new_w)
+            
+        # 2. 将所有样本的索引按照宽度从短到长进行排序
+        self.sorted_indices = sorted(range(len(self.group_ids)), key=lambda x: self.group_ids[x])
+        
+        # 3. 把排序后的索引，按照 batch_size 切分成一个一个的桶 (Batches)
+        self.batches = [self.sorted_indices[i:i + batch_size] 
+                        for i in range(0, len(self.sorted_indices), batch_size)]
+        
+        # 如果最后一个 batch 凑不够人数，丢弃它，防止算梯度时形状不稳
+        if self.batches and len(self.batches[-1]) < batch_size:
+            self.batches.pop()
+    
+    def __iter__(self):
+        # 4. 如果开启 shuffle，我们只打乱“桶的顺序”，绝不打乱“桶内部的顺序”
+        if self.shuffle:
+            # 拷贝一份避免破坏原始成员变量
+            temp_batches = list(self.batches)
+            random.shuffle(temp_batches)
+            for batch in temp_batches:
+                yield batch
+        else:
+            for batch in self.batches:
+                yield batch
+
+    def __len__(self):
+        return len(self.batches)
