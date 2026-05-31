@@ -7,10 +7,14 @@ from pathlib import Path
 
 # ================= 配置路径 =================
 # 根据你的软链接结构配置基础路径
-DATA_DIR = Path("/home/mwl/disk_space/Baseline-CRNN/data")
-RAW_IMG_DIR = DATA_DIR / "raw_deepjiandu" / "DeepJiandu" / "DeepJiandu"
-RAW_XML_DIR = DATA_DIR / "raw_deepjiandu" / "DeepJiandu" / "DeepJiandu_labels"
-OUT_DIR = DATA_DIR / "processed_sequence"
+# DATA_DIR = Path("/home/mwl/disk_space/Baseline-CRNN/data")
+# RAW_IMG_DIR = DATA_DIR / "raw_deepjiandu" / "DeepJiandu" / "DeepJiandu"
+# RAW_XML_DIR = DATA_DIR / "raw_deepjiandu" / "DeepJiandu" / "DeepJiandu_labels"
+# OUT_DIR = DATA_DIR / "processed_sequence"
+DATA_DIR = Path("/mnt/data/DeepJiandu2722")
+RAW_IMG_DIR = DATA_DIR / "images" 
+RAW_XML_DIR = DATA_DIR / "labels_xml" 
+OUT_DIR = Path("/mnt/proj/Baseline-CRNN/data/processed_sequence")
 
 # 简牍通常较窄，设置同一行单字中心点 x 轴波动的最大容忍像素值
 X_TOLERANCE = 80 
