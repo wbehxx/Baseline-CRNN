@@ -7,13 +7,23 @@ project:
   seed: 42                      # 固定随机种子，保证实验结果可复现
 
 data:
-  train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt"
-  train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train"
-  val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val_labels.txt"
-  val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val"
-  test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test_labels.txt"
-  test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test"
-  dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt"
+  train_list: "/mnt/proj/Baseline-CRNN/data/processed_sequence/train_labels.txt"
+  train_dir: "/mnt/proj/Baseline-CRNN/data/processed_sequence/train"
+  val_list: "/mnt/proj/Baseline-CRNN/data/processed_sequence/val_labels.txt"
+  val_dir: "/mnt/proj/Baseline-CRNN/data/processed_sequence/val"
+  test_list: "/mnt/proj/Baseline-CRNN/data/processed_sequence/test_labels.txt"
+  test_dir: "/mnt/proj/Baseline-CRNN/data/processed_sequence/test"
+  dict_path: "/mnt/proj/Baseline-CRNN/data/processed_sequence/dict.txt"
+
+# data:
+#   train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt"
+#   train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train"
+#   val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val_labels.txt"
+#   val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val"
+#   test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test_labels.txt"
+#   test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test"
+#   dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt"
+
 
 model:
   # img_height: 32                # CRNN 标准输入高度
@@ -27,11 +37,13 @@ model:
 
 train:
   epochs: 100                    # 训练总轮数
-  batch_size: 64                # 批次大小（若显存溢出可改为 32 或 16）
+  batch_size: 128                # 批次大小（若显存溢出可改为 32 或 16）
   learning_rate: 0.001          # 初始学习率
   num_workers: 0                # DataLoader 多进程加载数据的线程数
 
 log:
-  weights_dir: "/home/mwl/disk_space/Baseline-CRNN/weights/"       # 模型权重保存目录
-  logs_dir: "/home/mwl/disk_space/Baseline-CRNN/logs/"             # 训练日志保存目录
+  weights_dir: "/mnt/proj/Baseline-CRNN/weights/"       # 模型权重保存目录
+  logs_dir: "/mnt/proj/Baseline-CRNN/logs/"             # 训练日志保存目录
+  # weights_dir: "/home/mwl/disk_space/Baseline-CRNN/weights/"       # 模型权重保存目录
+  # logs_dir: "/home/mwl/disk_space/Baseline-CRNN/logs/"             # 训练日志保存目录
   val_interval: 1               # 每隔几个 epoch 进行一次验证并保存模型
