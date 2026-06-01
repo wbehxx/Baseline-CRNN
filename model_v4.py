@@ -3,10 +3,12 @@ import sys
 import types 
 
 # 挂载外部仓库源码
-sys.path.append('/home/mwl/disk_space/PaddleOCR2Pytorch_Core')
+sys.path.append('/mnt/proj/PaddleOCR2Pytorch')
+# sys.path.append('/home/mwl/disk_space/PaddleOCR2Pytorch_Core')
 from pytorchocr.modeling.architectures.base_model import BaseModel
 
-def build_ppocrv4_jiandu(num_classes, weight_path='/home/mwl/disk_space/PaddleOCR2Pytorch_Core/weights/ch_ptocr_v4_rec_server_infer.pth'):
+def build_ppocrv4_jiandu(num_classes, weight_path='/mnt/proj/PaddleOCR2Pytorch/weights/ch_ptocr_v4_rec_server_infer.pth'):
+# def build_ppocrv4_jiandu(num_classes, weight_path='/home/mwl/disk_space/PaddleOCR2Pytorch_Core/weights/ch_ptocr_v4_rec_server_infer.pth'):
     # 🎯 恢复双头配置，骗过 len(self.head_list) >= 2 的断言
     config = {
         'model_type': 'rec', 
@@ -30,7 +32,8 @@ def build_ppocrv4_jiandu(num_classes, weight_path='/home/mwl/disk_space/PaddleOC
     }
 
     model = BaseModel(config) 
-    pretrained_dict = torch.load(weight_path, map_location='cpu', weights_only=True)
+    pretrained_dict = torch.load(weight_path, map_location='cpu') #为了适配pytorch1.12去掉了新版本的参数
+    # pretrained_dict = torch.load(weight_path, map_location='cpu', weights_only=True)
     model_dict = model.state_dict()
     
     # 完美对齐注入
@@ -51,8 +54,11 @@ def build_ppocrv4_jiandu(num_classes, weight_path='/home/mwl/disk_space/PaddleOC
         ctc_out = self.ctc_head(ctc_feat)
         return {'CTC': ctc_out}
     
-    # 强行替换掉那个有 Bug 的 forward
-    model.head.forward = types.MethodType(safe_multihead_forward, model.head)
+    # 🛠️ 核心修复：通过 type(model.head) 抓取它的父类，直接在类级别重写 forward
+    # 坚决不用 types.MethodType，利用 Python 的原生描述符实现运行时动态 self 绑定
+    type(model.head).forward = safe_multihead_forward
+    # # 强行替换掉那个有 Bug 的 forward
+    # model.head.forward = types.MethodType(safe_multihead_forward, model.head)
     # ==========================================
 
     print(f"🔥 PP-OCRv4 引擎已就绪！成功加载层: {len(filtered_dict)}/{len(pretrained_dict)}。")

@@ -17,7 +17,8 @@ from itertools import count  # 新增这一行
 
 def train():
     # 1. 读取配置文件
-    with open('/home/mwl/disk_space/Baseline-CRNN/configs/config.yaml', 'r', encoding='utf-8') as f:
+    with open('/mnt/proj/Baseline-CRNN/configs/config.yaml', 'r', encoding='utf-8') as f:
+    # with open('/home/mwl/disk_space/Baseline-CRNN/configs/config.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
         
     # 固定随机种子
@@ -185,6 +186,12 @@ def train():
     #     {'params': backbone_params, 'lr': config['train']['learning_rate'] * 0.01},
     #     {'params': head_params, 'lr': config['train']['learning_rate']}
     # ], weight_decay=1e-4)  # 👈 新增这一句：L2 正则化，防止过拟合
+    
+    # 🛠️ 【核心新增】为了双卡训练：在优化器绑定参数之后，用 DataParallel 容器包裹模型
+    if torch.cuda.device_count() > 1:
+        logger.info(f"✨ 检测到 {torch.cuda.device_count()} 张可用显卡，开启 nn.DataParallel 双卡加速训练！")
+        # 将模型包裹进多卡并行容器，它会自动接管数据的分发与结果收集
+        model = nn.DataParallel(model)
 
     # 5. 【核心】早停机制 (Early Stopping) 设置
     best_cer = float('inf')   # 记录历史最低字符错误率，初始为无穷大
@@ -217,7 +224,9 @@ def train():
         for images, targets, target_lengths in pbar:
         # for batch_idx, (images, targets, target_lengths) in enumerate(pbar):
             images = images.to(device)
-            targets = targets.to(device)
+            # 🛠️ 精准修复：由于 cuDNN 的硬性物理限制，真实标签必须待在 CPU 大本营！
+            targets = targets.cpu()
+            # targets = targets.to(device)
             
             # 清空梯度
             optimizer.zero_grad()
@@ -234,8 +243,13 @@ def train():
             batch_size = images.size(0)
             
             # 获取模型输出的序列长度 (W)，填入一个张量中，并送到显卡
-            input_lengths = torch.IntTensor([preds.size(0)] * batch_size).to(device)
-            target_lengths = target_lengths.to(device)
+            # 🛠️ 干净利落地修改为：
+            # 1. 扔掉后面的 .to(device)，让它作为纯粹的 CPU 1D 张量诞生
+            input_lengths = torch.IntTensor([preds.size(0)] * batch_size) 
+            # 2. 确保它待在 CPU 上（如果从 DataLoader 出来时是显存状态，用 .cpu() 拽回来）
+            target_lengths = target_lengths.cpu()
+            # input_lengths = torch.IntTensor([preds.size(0)] * batch_size).to(device)
+            # target_lengths = target_lengths.to(device)
             
             # # 计算 CTC Loss
             # loss = criterion(preds, targets, input_lengths, target_lengths)
@@ -337,7 +351,9 @@ def train():
             with torch.no_grad():
                 for images, targets, target_lengths in tqdm(val_loader, desc=f"Epoch {epoch}/{epochs} [Val]"):
                     images = images.to(device)
-                    targets = targets.to(device)
+                    # 🛠️ 精准修复：由于 cuDNN 的硬性物理限制，真实标签必须待在 CPU 大本营！
+                    targets = targets.cpu()
+                    # targets = targets.to(device)
                     
                     preds_dict = model(images)
                     preds = preds_dict['CTC'] # 明确取出 CTC 的输出张量
@@ -350,8 +366,13 @@ def train():
                     batch_size = images.size(0)
                     # preds = model(images)
                     # batch_size = images.size(0)
-                    input_lengths = torch.IntTensor([preds.size(0)] * batch_size).to(device)
-                    target_lengths = target_lengths.to(device)
+                    # 🛠️ 干净利落地修改为：
+                    # 1. 扔掉后面的 .to(device)，让它作为纯粹的 CPU 1D 张量诞生
+                    input_lengths = torch.IntTensor([preds.size(0)] * batch_size) 
+                    # 2. 确保它待在 CPU 上（如果从 DataLoader 出来时是显存状态，用 .cpu() 拽回来）
+                    target_lengths = target_lengths.cpu()
+                    # input_lengths = torch.IntTensor([preds.size(0)] * batch_size).to(device)
+                    # target_lengths = target_lengths.to(device)
                     
                     # 验证集的 Loss
                     loss = criterion(preds, targets, input_lengths, target_lengths)
