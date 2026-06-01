@@ -23,7 +23,7 @@ weights/
 
 # 忽略任意层级的 build 文件夹
 # **/build/
-
+**/.ipynb_checkpoints/
 # 忽略 node_modules 文件夹（常见于前端项目）
 # node_modules/
 
