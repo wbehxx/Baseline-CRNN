@@ -9,22 +9,13 @@ import random
 
 class JianduDataset(Dataset):
     def __init__(self, labels_txt_path, img_dir, dict_path, img_height=32, max_width=512, is_train=False):
-        """
-        labels_txt_path: process_to_sequence.py 生成的 txxt 文件路径
-        img_dir: 截取后的序列图片存放文件夹
-        dict_path: 字典 dict.txt 路径
-        img_height: CRNN 模型的标准输入高度
-        max_width: 图片的最大宽度，超过则截断，不足则在 batch 阶段 pad
-        """
-        
         super().__init__()
         self.img_dir = img_dir
         self.img_height = img_height
         self.max_width = max_width
-        # self.is_train = is_train  # 记录当前数据集是否用于训练
-        self.is_train = is_train
+        self.is_train = is_train  # 记录当前数据集是否用于训练
         
-        # 加载字典，0 保留给 CTC 的 Blank 标签
+        # 加载字典，0是保留给CTC的Blank 标签
         self.char2id = {}
         self.id2char = {}
         with open(dict_path, 'r', encoding='utf-8') as f:
@@ -78,6 +69,7 @@ class JianduDataset(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, idx):
+        # 读取单张图
         img_name, text = self.data_list[idx]
         img_path = os.path.join(self.img_dir, img_name)
         
@@ -142,8 +134,7 @@ class JianduDataset(Dataset):
         # ====================================================================
 
         # 【修复】返回原始的 img 和 target_tensor，让 collate_fn 去处理长度拼接
-        return img, target_tensor
-
+        return img, target_tensor  # 返回处理好的图像矩阵和标签张量
 
 def jiandu_collate_fn(batch):
     """
@@ -161,6 +152,7 @@ def jiandu_collate_fn(batch):
     # # 构建 Batch 图片的 Tensor [batch_size, 1, height, max_w]
     # batch_images = torch.zeros(len(images), 1, images[0].shape[0], max_w)
     
+    # 把图片从单通道转为三通道，并padding
     for i, img in enumerate(images):
         w = img.shape[1]
         img_tensor = torch.from_numpy(img)
@@ -176,25 +168,7 @@ def jiandu_collate_fn(batch):
     # PyTorch 的 CTCLoss 要求 targets 是一维拼接的张量
     targets = torch.cat(labels, 0)
     
-    return batch_images, targets, target_lengths
-
-# ================= 单元测试使用 =================
-# 如果直接运行此文件，可以快速测试数据集加载是否正常
-if __name__ == '__main__':
-    # 确保你已经跑过 process_to_sequence.py
-    test_dataset = JianduDataset(
-        labels_txt_path='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt',
-        img_dir='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train',
-        dict_path='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt'
-    )
-    
-    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=True, collate_fn=jiandu_collate_fn)
-    
-    for imgs, targets, target_lengths in test_loader:
-        print("Batch Images Shape:", imgs.shape) # 预期: [4, 1, 32, max_w]
-        print("Targets Shape (concatenated):", targets.shape)
-        print("Target Lengths:", target_lengths)
-        break # 只测试第一个 batch
+    return batch_images, targets, target_lengths  # 返回打包好的大矩阵、展平的标签、各标签的真实长度
 
 # 分桶采样器：根据图片宽度分组，保证同一 batch 内的图片宽度相近，减少 padding 的浪费
 class LengthGroupedBatchSampler(Sampler):
@@ -247,3 +221,22 @@ class LengthGroupedBatchSampler(Sampler):
 
     def __len__(self):
         return len(self.batches)
+
+# ================= 单元测试使用 =================
+# 如果直接运行此文件，可以快速测试数据集加载是否正常
+if __name__ == '__main__':
+    # 确保你已经跑过 process_to_sequence.py
+    test_dataset = JianduDataset(
+        labels_txt_path='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt',
+        img_dir='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train',
+        dict_path='/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt'
+    )
+    
+    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=True, collate_fn=jiandu_collate_fn)
+    
+    for imgs, targets, target_lengths in test_loader:
+        print("Batch Images Shape:", imgs.shape) # 预期: [4, 1, 32, max_w]
+        print("Targets Shape (concatenated):", targets.shape)
+        print("Target Lengths:", target_lengths)
+        break # 只测试第一个 batch
+
