@@ -16,6 +16,7 @@ weights/
 *.bmp
 *.jpg
 *.png
+*.onnx
 # !important.txt
 
 # 忽略根目录下的 secret.env 文件（不是任意子目录下的）
