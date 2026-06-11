@@ -141,32 +141,35 @@ def train():
     # # 👆 ====================================================================== 👆
 
     # 4. 实例化模型、损失函数和优化器
-    model = build_ppocrv4_jiandu(num_classes=train_dataset.num_classes).to(device)
+    # model = build_ppocrv4_jiandu(num_classes=train_dataset.num_classes).to(device)
     
-    # model = CRNN(
-    #     img_height=config['model']['img_height'],
-    #     nc=config['model']['nc'],
-    #     num_classes=num_classes,
-    #     nh=config['model']['nh']
-    # ).to(device)
+    model = CRNN(
+        img_height=config['model']['img_height'],
+        nc=3,
+        num_classes=train_dataset.num_classes,
+        nh=config['model']['nh']
+    ).to(device)
 
     # zero_infinity=True 是防止早期预测极端导致 Loss 变为 NaN 的保命设置
     criterion = nn.CTCLoss(blank=0, zero_infinity=True).to(device)
     
     # ---------------- 替换原来的 optimizer = optim.Adam(...) ----------------
     # 区分预训练参数和随机初始化的头部参数
-    head_params = []
-    backbone_params = []
-    for name, param in model.named_parameters():
-        if 'head' in name: 
-            head_params.append(param)
-        else:
-            backbone_params.append(param)
+    # head_params = []
+    # backbone_params = []
+    # for name, param in model.named_parameters():
+    #     if 'head' in name: 
+    #         head_params.append(param)
+    #     else:
+    #         backbone_params.append(param)
     # 使用 AdamW 替代 Adam，完美解耦权重衰减
-    optimizer = optim.AdamW([
-        {'params': backbone_params, 'lr': config['train']['learning_rate'] * 0.01},
-        {'params': head_params, 'lr': config['train']['learning_rate']}
-    ], weight_decay=5e-5)  # 衰减从 1e-4 降为 1e-5
+    # optimizer = optim.AdamW([
+    #     {'params': backbone_params, 'lr': config['train']['learning_rate'] * 0.01},
+    #     {'params': head_params, 'lr': config['train']['learning_rate']}
+    # ], weight_decay=5e-5)  # 衰减从 1e-4 降为 1e-5
+
+    # 🛠️ 一键替换为优雅的全局 AdamW 优化器
+    optimizer = optim.AdamW(model.parameters(), lr=config['train']['learning_rate'], weight_decay=1e-4)
 
     # 记录初始学习率以便 Warmup 使用
     initial_lrs = [group['lr'] for group in optimizer.param_groups]
@@ -222,14 +225,14 @@ def train():
             # 清空梯度
             optimizer.zero_grad()
             # 前向传播
-            preds = model(images)['CTC']
-            # preds = model(images) # 形状: [序列长度W, batch_size, num_classes]
+            # preds = model(images)['CTC']
+            preds = model(images) # 形状: [序列长度W, batch_size, num_classes]
 
-            # 👇 【真正救命的一行代码】将裸 Logits 转换为对数概率！
-            preds = F.log_softmax(preds, dim=2)
-            # 👇 【关键修复】一键转置，互换第 0 维(Batch)和第 1 维(Time)
-            preds = preds.permute(1, 0, 2)
-            # 现在 preds 的形状变成了 CTCLoss 喜欢的 [Time, Batch, Num_Classes]
+            # # 👇 【真正救命的一行代码】将裸 Logits 转换为对数概率！
+            # preds = F.log_softmax(preds, dim=2)
+            # # 👇 【关键修复】一键转置，互换第 0 维(Batch)和第 1 维(Time)
+            # preds = preds.permute(1, 0, 2)
+            # # 现在 preds 的形状变成了 CTCLoss 喜欢的 [Time, Batch, Num_Classes]
 
             batch_size = images.size(0)
             
@@ -339,17 +342,17 @@ def train():
                     images = images.to(device)
                     targets = targets.to(device)
                     
-                    preds_dict = model(images)
-                    preds = preds_dict['CTC'] # 明确取出 CTC 的输出张量
+                    # preds_dict = model(images)
+                    # preds = preds_dict['CTC'] # 明确取出 CTC 的输出张量
                     
-                    # 👇 【验证集也要加上这一行】
-                    preds = F.log_softmax(preds, dim=2)
-                    # 👇 【关键修复】验证集同样需要转置
-                    preds = preds.permute(1, 0, 2)
+                    # # 👇 【验证集也要加上这一行】
+                    # preds = F.log_softmax(preds, dim=2)
+                    # # 👇 【关键修复】验证集同样需要转置
+                    # preds = preds.permute(1, 0, 2)
                     
-                    batch_size = images.size(0)
-                    # preds = model(images)
                     # batch_size = images.size(0)
+                    preds = model(images)
+                    batch_size = images.size(0)
                     input_lengths = torch.IntTensor([preds.size(0)] * batch_size).to(device)
                     target_lengths = target_lengths.to(device)
                     
@@ -424,8 +427,10 @@ def train():
                 scheduler.step(current_cer)
                 
             # 打印当前学习率, 打印头部学习率，因为它是主角
-            current_lr = optimizer.param_groups[1]['lr'] 
-            logger.info(f"📉 当前 Head 学习率: {current_lr:.6f}")
+            # current_lr = optimizer.param_groups[1]['lr'] 
+            # logger.info(f"📉 当前 Head 学习率: {current_lr:.6f}")
+            current_lr = optimizer.param_groups[0]['lr'] 
+            logger.info(f"📉 当前学习率: {current_lr:.6f}")
 
             # ================= 早停与模型保存逻辑 =================
             if current_cer < best_cer:
