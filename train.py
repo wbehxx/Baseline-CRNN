@@ -1,4 +1,5 @@
 import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 import yaml
 import torch
 import torch.nn as nn
@@ -120,7 +121,6 @@ def train():
 
     # 初始化标签转换器 (翻译官)
     converter = CTCLabelConverter(config['data']['dict_path'])
-    # num_classes = len(converter.char2id) + 1  # 字典字数 + 1个Blank标签
 
     # # 👇 ================= 【新增】初始化 Beam Search 解码器 ================= 👇
     # # 1. 构建符合 torchaudio 格式的字符列表 
@@ -283,18 +283,17 @@ def train():
                 epoch_anomaly_count += 1
                 
                 # 只有前 3 次异常会打印详细分析，防止刷屏
-                if epoch_anomaly_count <= 3:
+                # if epoch_anomaly_count <= 3:
+                if epoch_anomaly_count <= 1:    # 修改：只打印第一次异常
                     # 区分是 inf 还是 nan
                     loss_type = "INF (数学下溢/极度自信误判)" if torch.isinf(loss) else "NAN (梯度污染/权重损坏)"
-                    logger.warning(f"🚨 异常拦截 [{epoch_anomaly_count}/3] | 类型: {loss_type}")
-                    
-                    if torch.isinf(loss):
-                        logger.warning("    -> 诊断: 模型对正确路径预测概率趋近于0。通常因为初期权重未对齐，或遇到了极度离谱的样本。")
-                    elif torch.isnan(loss):
-                        logger.warning("    -> 诊断: 模型的输入 preds 中存在 NaN！这说明之前的更新可能已产生脏梯度，请检查学习率是否过大。")
-                        
-                elif epoch_anomaly_count == 4:
-                    logger.warning("🔇 护盾提示：本轮异常次数已达限额，后续将开启【静默拦截模式】不再打印...")
+                    logger.warning(f"🚨 异常拦截 [{epoch_anomaly_count}/3] | 类型: {loss_type}")                
+                    # if torch.isinf(loss):
+                    #     logger.warning("    -> 诊断: 模型对正确路径预测概率趋近于0。通常因为初期权重未对齐，或遇到了极度离谱的样本。")
+                    # elif torch.isnan(loss):
+                    #     logger.warning("    -> 诊断: 模型的输入 preds 中存在 NaN！这说明之前的更新可能已产生脏梯度，请检查学习率是否过大。"                        
+                # elif epoch_anomaly_count == 4:
+                #     logger.warning("🔇 护盾提示：本轮异常次数已达限额，后续将开启【静默拦截模式】不再打印...")
                 
                 # 核心救命操作：清空当前可能产生的脏梯度，跳过本次更新
                 optimizer.zero_grad()
@@ -303,6 +302,17 @@ def train():
 
             # 反向传播与优化
             loss.backward()
+
+            # 🛠️ 终极加固：做一次法医级的【梯度健康检查】
+            grad_is_nan = False
+            for p in model.parameters():
+                if p.grad is not None and (torch.isnan(p.grad).any() or torch.isinf(p.grad).any()):
+                    grad_is_nan = True
+                    break
+            if grad_is_nan:
+                logger.warning("🚨 警告：虽然 Loss 正常，但反向传播产生了 NaN 毒性梯度！已强行熔断本次参数更新。")
+                optimizer.zero_grad() # 赶紧清空，不许更新
+                continue              # 丢弃这个坏 Batch 的努力
 
             # # 👇 【关键】梯度累积逻辑：每攒够 accumulation_steps 个 batch，才更新一次
             # if (batch_idx + 1) % accumulation_steps == 0:
@@ -328,8 +338,8 @@ def train():
         logger.info(f"Epoch {epoch} | 训练 Loss: {avg_train_loss:.4f}")
         # 👇 汇报本轮到底拦截了多少次
         if epoch_anomaly_count > 0:
-            logger.warning(f"🛡️ 战况总结：本轮共成功拦截了 {epoch_anomaly_count} 个异常 Batch。")
-        
+            # logger.warning(f"🛡️ 战况总结：本轮共成功拦截了 {epoch_anomaly_count} 个异常 Batch。")
+            logger.warning(f"🛡️ 战况总结：本轮共成功拦截了 {epoch_anomaly_count}/{len(train_loader)} 个异常 Batch。")
         # ================= 开始验证循环 =======================================
         if epoch % config['log']['val_interval'] == 0:
             model.eval()
@@ -412,7 +422,7 @@ def train():
             logger.info(f"Epoch {epoch} | 验证 Loss: {avg_val_loss:.4f} | CER: {current_cer:.4f}")
             # 打印几个样本对照，直观感受模型学得怎么样
             # # 🛠️ 修复：动态寻找整个验证集中真实字数最多的那个样本的索引
-            print_idx = max(range(len(all_targets_str)), key=lambda i: len(all_targets_str[i]))-50
+            print_idx = max(range(len(all_targets_str)), key=lambda i: len(all_targets_str[i]))-20
             logger.info(f"👀抽查样本|预测：{all_preds_str[print_idx]}")
             logger.info(f"👀抽查样本|真实：{all_targets_str[print_idx]}")
 
