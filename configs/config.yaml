@@ -7,19 +7,27 @@ project:
   seed: 42                      # 固定随机种子，保证实验结果可复现
 
 data:
-  train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt"
-  train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train"
-  val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val_labels.txt"
-  val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val"
-  test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test_labels.txt"
-  test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test"
-  dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt"
+  train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/train_labels.txt"
+  train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/train"
+  val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/val_labels.txt"
+  val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/val"
+  test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/test_labels.txt"
+  test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/test"
+  dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_horizontal_sequence/dict.txt"
+
+  # train_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train_labels.txt"
+  # train_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/train"
+  # val_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val_labels.txt"
+  # val_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/val"
+  # test_list: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test_labels.txt"
+  # test_dir: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/test"
+  # dict_path: "/home/mwl/disk_space/Baseline-CRNN/data/processed_sequence/dict.txt"
 
 model:
-  img_height: 32                # CRNN 标准输入高度
-  max_width: 512                # 序列最大宽度（不足补零，超出截断）
-  # img_height: 48
-  # max_width: 1024
+  # img_height: 32                # CRNN 标准输入高度
+  # max_width: 512                # 序列最大宽度（不足补零，超出截断）
+  img_height: 48
+  max_width: 1024
   
   
   nc: 1                         # 图像通道数（红外/灰度图必须设为 1）
